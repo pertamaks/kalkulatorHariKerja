@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Working Days Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Kalkulator Hari Kerja</h2>
+        <form id="workingDaysForm">
+            <label for="month">Pilih Bulan:</label>
+            <select id="month" name="month" required>
+                <option value="">Pilih Bulan...</option>
+                <option value="january">Januari</option>
+                <option value="february">Februari</option>
+                <option value="march">Maret</option>
+                <option value="april">April</option>
+                <option value="may">Mei</option>
+                <option value="june">Juni</option>
+                <option value="july">Juli</option>
+                <option value="august">Agustus</option>
+                <option value="september">September</option>
+                <option value="october">Oktober</option>
+                <option value="november">November</option>
+                <option value="december">Desember</option>
+            </select>
+            <label for="year">Pilih Tahun:</label>
+            <select id="year" name="year" required>
+                <!-- Options will be added dynamically by JavaScript -->
+            </select>
+            <button type="submit" id="calculateButton">Kalkulasi</button>
+            <!-- <button type="button" id="resetButton" style="display:none">Reset</button> -->
+        </form>
+        <div id="result"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
