@@ -1,112 +1,208 @@
+// --- DOMContentLoaded Event Listener ---
 document.addEventListener('DOMContentLoaded', function () {
+    // --- Element References ---
     const yearDropdown = document.getElementById('year');
-    const currentYear = new Date().getFullYear();
+    const workingDaysForm = document.getElementById('workingDaysForm');
+    const resultContainer = document.getElementById('result');
+    const calculateButton = document.getElementById('calculateButton');
 
-    // Add options for current year and previous 4 years
-    for (let i = 0; i < 5; i++) {
-        const option = document.createElement('option');
-        option.value = currentYear - i;
-        option.textContent = currentYear - i;
-        yearDropdown.appendChild(option);
-    }
+    // --- Initial Setup ---
+    populateYearDropdown(yearDropdown);
 
-    document.getElementById('workingDaysForm').addEventListener('submit', async function(event) {
+    // --- Event Listeners ---
+    workingDaysForm.addEventListener('submit', async function(event) {
         event.preventDefault();
         
-        const monthName = document.getElementById('month').value;
-        const year = parseInt(document.getElementById('year').value);
+        // Show loading state
+        calculateButton.textContent = 'Menghitung...';
+        calculateButton.disabled = true;
+        resultContainer.innerHTML = '';
 
-        // Convert month name to month number
+        const monthName = document.getElementById('month').value;
+        const year = parseInt(yearDropdown.value);
         const monthNumber = monthNameToNumber(monthName);
 
         try {
             const holidaysData = await fetchHolidays(monthNumber, year);
-            const result = await calculateWorkingDays(monthNumber, year, holidaysData);
-            displayResult(result, holidaysData, monthName);
-            toggleButtonState();
+            const result = calculateWorkingDays(monthNumber, year, holidaysData);
+            displayResult(result, holidaysData, monthName, year, resultContainer);
         } catch (error) {
             console.error('Error:', error.message);
-            document.getElementById('result').textContent = `Error: ${error.message}`;
+            resultContainer.textContent = `Error: ${error.message}`;
+        } finally {
+            // Restore button state
+            calculateButton.textContent = 'Kalkulasi';
+            calculateButton.disabled = false;
         }
     });
-
-    // document.getElementById('resetButton').addEventListener('click', function() {
-    //     document.getElementById('workingDaysForm').reset();
-    //     document.getElementById('result').textContent = '';
-    //     toggleButtonState();
-    // });
 });
 
+// --- Core Functions ---
+
+/**
+ * Populates the year dropdown with 5 years, centered on the current year.
+ * @param {HTMLSelectElement} dropdownElement The select element to populate.
+ */
+function populateYearDropdown(dropdownElement) {
+    const currentYear = new Date().getFullYear();
+    for (let i = 2; i >= -2; i--) {
+        const yearValue = currentYear + i;
+        const option = document.createElement('option');
+        option.value = yearValue;
+        option.textContent = yearValue;
+        if (yearValue === currentYear) {
+            option.selected = true;
+        }
+        dropdownElement.appendChild(option);
+    }
+}
+
+/**
+ * Fetches holiday data from the API.
+ * @param {number} month The month number (1-12).
+ * @param {number} year The year.
+ * @returns {Promise<Array>} A promise that resolves to an array of holiday objects.
+ */
 async function fetchHolidays(month, year) {
-    try {
-        const response = await fetch(`https://api-harilibur.vercel.app/api?month=${month}&year=${year}`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch holidays');
+    const response = await fetch(`https://api-harilibur.vercel.app/api?month=${month}&year=${year}`);
+    if (!response.ok) {
+        throw new Error('Gagal mengambil data hari libur. Silakan coba lagi.');
+    }
+    return await response.json();
+}
+
+/**
+ * Calculates the number of working days in a given month and year.
+ * @param {number} month The month number (1-12).
+ * @param {number} year The year.
+ * @param {Array} holidaysData Array of holiday objects.
+ * @returns {{totalWorkingDays: number, nationalHolidays: number}} An object containing the results.
+ */
+function calculateWorkingDays(month, year, holidaysData) {
+    const totalDaysInMonth = new Date(year, month, 0).getDate();
+    let workingDays = 0;
+
+    for (let day = 1; day <= totalDaysInMonth; day++) {
+        const currentDate = new Date(year, month - 1, day);
+        const dayOfWeek = currentDate.getDay();
+        // 0 = Sunday, 6 = Saturday
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            workingDays++;
         }
-        return await response.json();
-    } catch (error) {
-        console.error('Error:', error.message);
-        throw error;
+    }
+
+    const nationalHolidaysOnWeekdays = holidaysData.filter(holiday => {
+        const holidayDate = new Date(holiday.holiday_date);
+        const holidayDayOfWeek = holidayDate.getDay();
+        return holiday.is_national_holiday && holidayDayOfWeek !== 0 && holidayDayOfWeek !== 6;
+    }).length;
+
+    return {
+        totalWorkingDays: workingDays - nationalHolidaysOnWeekdays,
+        nationalHolidays: nationalHolidaysOnWeekdays
+    };
+}
+
+// --- Display Functions ---
+
+/**
+ * Displays the calculation results in the specified container.
+ * @param {object} result The result object from calculateWorkingDays.
+ * @param {Array} holidaysData The raw holiday data from the API.
+ * @param {string} monthName The name of the month.
+ * @param {number} year The selected year.
+ * @param {HTMLElement} container The HTML element to display the results in.
+ */
+function displayResult(result, holidaysData, monthName, year, container) {
+    container.innerHTML = ''; // Clear previous results
+
+    const indonesianMonth = getMonthName(toTitleCase(monthName));
+    
+    // Create and append the main result heading
+    const workingDaysParagraph = document.createElement('p');
+    workingDaysParagraph.textContent = `Total hari kerja di bulan ${indonesianMonth} ${year} adalah: ${result.totalWorkingDays} hari`;
+    workingDaysParagraph.className = 'result-heading';
+    container.appendChild(workingDaysParagraph);
+
+    // Filter for national holidays that fall on a weekday
+    const nationalHolidays = holidaysData.filter(holiday => 
+        holiday.is_national_holiday && !isWeekend(new Date(holiday.holiday_date))
+    );
+
+    if (nationalHolidays.length > 0) {
+        // Create and append the holiday list
+        const headerText = document.createElement('p');
+        headerText.textContent = 'Daftar hari libur nasional pada hari kerja:';
+        container.appendChild(headerText);
+
+        const holidaysList = document.createElement('ul');
+        nationalHolidays
+            .sort((a, b) => new Date(a.holiday_date) - new Date(b.holiday_date))
+            .forEach(holiday => {
+                const holidayItem = document.createElement('li');
+                holidayItem.textContent = `${holiday.holiday_name} - ${formatDateToIndonesian(holiday.holiday_date)}`;
+                holidaysList.appendChild(holidayItem);
+            });
+        container.appendChild(holidaysList);
+    } else {
+        const noHolidaysParagraph = document.createElement('p');
+        noHolidaysParagraph.textContent = 'Tidak ada hari libur nasional pada hari kerja di bulan ini.';
+        container.appendChild(noHolidaysParagraph);
     }
 }
 
-async function calculateWorkingDays(month, year, holidaysData) {
-    try {
-        // Input validation
-        if (isNaN(month) || month < 1 || month > 12) {
-            throw new Error('Invalid month. Month should be between 1 and 12.');
-        }
 
-        if (isNaN(year) || year < 1900 || year > new Date().getFullYear()) {
-            throw new Error('Invalid year. Year should be between 1900 and current year.');
-        }
+// --- Utility Functions ---
 
-        // Function to get the number of working days in a month
-        function getWorkingDays(year, month) {
-            const totalDays = new Date(year, month, 0).getDate();
-            const weekends = [0, 6]; // Sunday (0) and Saturday (6) are weekends
-            let workingDays = 0;
-
-            for (let i = 1; i <= totalDays; i++) {
-                const currentDate = new Date(year, month - 1, i);
-                if (!weekends.includes(currentDate.getDay())) {
-                    workingDays++;
-                }
-            }
-
-            return workingDays;
-        }
-
-        // Count the number of national holidays
-        const nationalHolidays = holidaysData.filter(holiday => holiday.is_national_holiday).length;
-
-        // Get the total number of working days in the month
-        const totalWorkingDays = getWorkingDays(year, month);
-
-        // Subtract national holidays from total working days
-        const workingDaysAfterHolidays = totalWorkingDays - nationalHolidays;
-
-        return {
-            totalWorkingDays: workingDaysAfterHolidays,
-            nationalHolidays: nationalHolidays
-        };
-    } catch (error) {
-        console.error('Error:', error.message);
-        throw error;
-    }
+/**
+ * Checks if a given date is a weekend.
+ * @param {Date} date The date to check.
+ * @returns {boolean} True if the date is a weekend, false otherwise.
+ */
+function isWeekend(date) {
+    const day = date.getDay();
+    return day === 0 || day === 6; // Sunday or Saturday
 }
 
+/**
+ * Converts a month name to its corresponding number.
+ * @param {string} monthName The name of the month.
+ * @returns {number} The month number (1-12).
+ */
+function monthNameToNumber(monthName) {
+    const months = {
+        'january': 1, 'february': 2, 'march': 3, 'april': 4,
+        'may': 5, 'june': 6, 'july': 7, 'august': 8,
+        'september': 9, 'october': 10, 'november': 11, 'december': 12
+    };
+    return months[monthName.toLowerCase()] || 0;
+}
+
+/**
+ * Converts a string to Title Case.
+ * @param {string} str The string to convert.
+ * @returns {string} The Title Cased string.
+ */
 function toTitleCase(str) {
-    return str.replace(/\w\S*/g, function(txt) {
-        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-    });
+    return str.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 }
 
-function getDayName(dayIndex) {
-    const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    return days[dayIndex];
+/**
+ * Formats a date string into a full Indonesian date format.
+ * @param {string} dateString The date string to format.
+ * @returns {string} The formatted date string.
+ */
+function formatDateToIndonesian(dateString) {
+    const date = new Date(dateString);
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' };
+    return date.toLocaleDateString('id-ID', options);
 }
 
+/**
+ * Gets the Indonesian name for a given English month name.
+ * @param {string} monthName The English month name.
+ * @returns {string} The Indonesian month name.
+ */
 function getMonthName(monthName) {
     const months = {
         'January': 'Januari', 'February': 'Februari', 'March': 'Maret', 'April': 'April',
@@ -114,81 +210,4 @@ function getMonthName(monthName) {
         'September': 'September', 'October': 'Oktober', 'November': 'November', 'December': 'Desember'
     };
     return months[monthName] || monthName;
-}
-
-function formatDateToIndonesian(dateString) {
-    const date = new Date(dateString);
-    const dayIndex = date.getDay();
-    const dayName = getDayName(dayIndex);
-    const dateNumber = date.getDate();
-    const monthName = getMonthName(date.toLocaleString('en-US', { month: 'long' }));
-    const year = date.getFullYear();
-
-    return `${dayName} ${dateNumber} ${monthName} ${year}`;
-}
-
-function displayResult(result, holidaysData, monthName) {
-    monthName = toTitleCase(monthName); // Convert month name to title case
-    const resultContainer = document.getElementById('result');
-    resultContainer.innerHTML = ''; // Clear previous result
-
-    // Display total working days after holidays
-    const workingDaysParagraph = document.createElement('p');
-    const indonesianMonth = getMonthName(monthName);
-    workingDaysParagraph.textContent = `Total hari kerja di bulan ${indonesianMonth} adalah : ${result.totalWorkingDays} hari`;
-    workingDaysParagraph.classList.add('result-heading');
-    resultContainer.appendChild(workingDaysParagraph);
-
-    // Filter national holidays that don't occur on weekends
-    const nationalHolidays = holidaysData.filter(holiday => holiday.is_national_holiday && !isWeekend(new Date(holiday.holiday_date)));
-
-    if (nationalHolidays.length > 0) {
-        // Sort holidays by date in ascending order
-        nationalHolidays.sort((a, b) => new Date(a.holiday_date) - new Date(b.holiday_date));
-        
-        const holidaysList = document.createElement('ul');
-    
-        // Add header text before listing the holidays
-        const headerText = document.createElement('p');
-        headerText.textContent = 'Hari libur di hari kerja dalam bulan ini adalah:';
-        resultContainer.appendChild(headerText);
-    
-        nationalHolidays.forEach(holiday => {
-            const holidayItem = document.createElement('li');
-            const indonesianDate = new Date(holiday.holiday_date);
-            holidayItem.textContent = `${holiday.holiday_name} pada ${formatDateToIndonesian(indonesianDate)}`;
-            holidaysList.appendChild(holidayItem);
-        });
-        resultContainer.appendChild(holidaysList);
-    } else {
-        const noHolidaysParagraph = document.createElement('p');
-        noHolidaysParagraph.textContent = `Tidak ada hari libur Nasional di hari kerja dalam Bulan ini.`;
-        resultContainer.appendChild(noHolidaysParagraph);
-    }    
-}
-
-function isWeekend(date) {
-    const day = date.getDay();
-    return day === 0 || day === 6; // Sunday (0) and Saturday (6) are weekends
-}
-
-function toggleButtonState() {
-    const calculateBtn = document.getElementById('calculateBtn');
-
-    if (calculateBtn) {
-        if (calculateBtn.style.display === 'none') {
-            calculateBtn.style.display = 'inline-block';
-        } else {
-            calculateBtn.style.display = 'none';
-        }
-    }
-}
-
-function monthNameToNumber(monthName) {
-    const months = {
-        'january': 1, 'february': 2, 'march': 3, 'april': 4,
-        'may': 5, 'june': 6, 'july': 7, 'august': 8,
-        'september': 9, 'october': 10, 'november': 11, 'december': 12
-    };
-    return months[monthName.toLowerCase()] || 1; // Default to 0 if month name is not found
 }
