@@ -4,16 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Working Days Calculator</title>
+    <!-- Link to the modern stylesheet -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <h2>Kalkulator Hari Kerja</h2>
-        <p>Kalkulator ini akan menghitung hari kerja dikurangi hari libur yang muncul pada hari kerja pada setiap bulan.</p>
+        <p style="text-align: center; color: var(--subtle-text-color); margin-top: -16px; margin-bottom: 32px;">
+            Hitung jumlah hari kerja dalam sebulan, secara otomatis mengurangi akhir pekan dan hari libur nasional.
+        </p>
+        
         <form id="workingDaysForm">
             <label for="month">Pilih Bulan:</label>
             <select id="month" name="month" required>
-                <option value="">Pilih Bulan...</option>
+                <option value="" disabled selected>Pilih Bulan...</option>
                 <option value="january">Januari</option>
                 <option value="february">Februari</option>
                 <option value="march">Maret</option>
@@ -27,16 +31,20 @@
                 <option value="november">November</option>
                 <option value="december">Desember</option>
             </select>
+            
             <label for="year">Pilih Tahun:</label>
             <select id="year" name="year" required>
                 <!-- Options will be added dynamically by JavaScript -->
             </select>
+            
             <button type="submit" id="calculateButton">Kalkulasi</button>
-            <!-- <button type="button" id="resetButton" style="display:none">Reset</button> -->
         </form>
+        
+        <!-- The result will be displayed here -->
         <div id="result"></div>
     </div>
 
+    <!-- Link to your JavaScript file -->
     <script src="app.js"></script>
 </body>
 </html>
