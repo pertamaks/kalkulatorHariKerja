@@ -193,7 +193,17 @@ function toTitleCase(str) {
  * @returns {string} The formatted date string.
  */
 function formatDateToIndonesian(dateString) {
-    const date = new Date(dateString);
+    // The date string from the API is 'YYYY-MM-DD'.
+    // Creating a new Date(dateString) can be unreliable as browsers
+    // may interpret it as local time or UTC. To avoid the date shifting
+    // by a day due to timezone differences, we parse the string manually
+    // and create the date using UTC values.
+    const parts = dateString.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1; // JavaScript months are 0-indexed
+    const day = parseInt(parts[2], 10);
+    const date = new Date(Date.UTC(year, month, day));
+
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' };
     return date.toLocaleDateString('id-ID', options);
 }
